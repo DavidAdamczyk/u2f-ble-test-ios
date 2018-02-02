@@ -96,10 +96,10 @@ final class DataReader {
 
     // MARK: Internal methods
     
-    fileprivate func readNextInteger<T: Integer>() -> T? {
+    fileprivate func readNextInteger<T: BinaryInteger>() -> T? {
         guard let data = readNextDataOfLength(MemoryLayout<T>.size) else { return nil }
         
-        var value: T = 0
+        var value: T = T(0)
         (data as NSData).getBytes(&value, length: MemoryLayout<T>.size)
         return value
     }
@@ -107,7 +107,7 @@ final class DataReader {
     fileprivate func readNextInteger<T: EndianConvertible>(bigEndian: Bool) -> T? {
         guard let data = readNextDataOfLength(MemoryLayout<T>.size) else { return nil }
         
-        var value: T = 0 as! T
+        var value: T = T(0)
         (data as NSData).getBytes(&value, length: MemoryLayout<T>.size)
         return bigEndian ? value.bigEndian : value.littleEndian
     }

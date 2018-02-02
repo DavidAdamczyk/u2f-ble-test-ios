@@ -82,7 +82,7 @@ final class DataWriter {
         internalData.append(data)
     }
     
-    fileprivate func writeNextInteger<T: Integer>(_ value: T) {
+    fileprivate func writeNextInteger<T: BinaryInteger>(_ value: T) {
         var value = value
         internalData.append(&value, length: MemoryLayout<T>.size)
     }

@@ -163,7 +163,7 @@ class ViewController: UIViewController {
     
     fileprivate func appendLogMessage(_ message: String) {
         textView.text = textView.text + "- \(message)\n"
-        let range = NSMakeRange(textView.text.characters.count - 1, 1)
+        let range = NSMakeRange(textView.text.count - 1, 1)
         UIView.setAnimationsEnabled(false)
         textView.scrollRangeToVisible(range)
         UIView.setAnimationsEnabled(true)
