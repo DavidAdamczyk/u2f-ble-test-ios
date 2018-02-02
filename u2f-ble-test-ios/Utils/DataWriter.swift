@@ -10,10 +10,10 @@ import Foundation
 
 final class DataWriter {
     
-    private let internalData: NSMutableData
+    fileprivate let internalData: NSMutableData
     
-    var data: NSData {
-        return internalData.copy() as! NSData
+    var data: Data {
+        return internalData.copy() as! Data
     }
     
     var dataLength: Int {
@@ -22,75 +22,75 @@ final class DataWriter {
     
     // MARK: Write methods
 
-    func writeNextUInt8(value: UInt8) {
+    func writeNextUInt8(_ value: UInt8) {
         writeNextInteger(value)
     }
     
-    func writeNextInt8(value: Int8) {
+    func writeNextInt8(_ value: Int8) {
         writeNextInteger(value)
     }
     
-    func writeNextBigEndianUInt16(value: UInt16) {
+    func writeNextBigEndianUInt16(_ value: UInt16) {
         writeNextInteger(value, bigEndian: true)
     }
     
-    func writeNextLittleEndianUInt16(value: UInt16) {
+    func writeNextLittleEndianUInt16(_ value: UInt16) {
         writeNextInteger(value, bigEndian: false)
     }
     
-    func writeNextBigEndianInt16(value: Int16) {
+    func writeNextBigEndianInt16(_ value: Int16) {
         writeNextInteger(value, bigEndian: true)
     }
     
-    func writeNextLittleEndianInt16(value: Int16) {
+    func writeNextLittleEndianInt16(_ value: Int16) {
         writeNextInteger(value, bigEndian: false)
     }
     
-    func writeNextBigEndianUInt32(value: UInt32) {
+    func writeNextBigEndianUInt32(_ value: UInt32) {
         writeNextInteger(value, bigEndian: true)
     }
 
-    func writeNextLittleEndianUInt32(value: UInt32) {
+    func writeNextLittleEndianUInt32(_ value: UInt32) {
         writeNextInteger(value, bigEndian: false)
     }
     
-    func writeNextBigEndianInt32(value: Int32) {
+    func writeNextBigEndianInt32(_ value: Int32) {
         writeNextInteger(value, bigEndian: true)
     }
     
-    func writeNextLittleEndianInt32(value: Int32) {
+    func writeNextLittleEndianInt32(_ value: Int32) {
         writeNextInteger(value, bigEndian: false)
     }
     
-    func writeNextBigEndianUInt64(value: UInt64) {
+    func writeNextBigEndianUInt64(_ value: UInt64) {
         writeNextInteger(value, bigEndian: true)
     }
     
-    func writeNextLittleEndianUInt64(value: UInt64) {
+    func writeNextLittleEndianUInt64(_ value: UInt64) {
         writeNextInteger(value, bigEndian: false)
     }
     
-    func writeNextBigEndianInt64(value: Int64) {
+    func writeNextBigEndianInt64(_ value: Int64) {
         writeNextInteger(value, bigEndian: true)
     }
     
-    func writeNextLittleEndianInt64(value: Int64) {
+    func writeNextLittleEndianInt64(_ value: Int64) {
         writeNextInteger(value, bigEndian: false)
     }
     
-    func writeNextData(data: NSData) {
-        internalData.appendData(data)
+    func writeNextData(_ data: Data) {
+        internalData.append(data)
     }
     
-    private func writeNextInteger<T: IntegerType>(value: T) {
+    fileprivate func writeNextInteger<T: Integer>(_ value: T) {
         var value = value
-        internalData.appendBytes(&value, length: sizeof(T))
+        internalData.append(&value, length: MemoryLayout<T>.size)
     }
     
-    private func writeNextInteger<T: EndianConvertible>(value: T, bigEndian: Bool) {
+    fileprivate func writeNextInteger<T: EndianConvertible>(_ value: T, bigEndian: Bool) {
         var value = value
         value = bigEndian ? value.bigEndian : value.littleEndian
-        internalData.appendBytes(&value, length: sizeof(T))
+        internalData.append(&value, length: MemoryLayout<T>.size)
     }
     
     // MARK: Initialization

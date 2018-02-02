@@ -26,14 +26,14 @@ final class DeviceManager: NSObject {
     var deviceName: String? { return peripheral.name }
     var onStateChanged: ((DeviceManager, DeviceManagerState) -> Void)?
     var onDebugMessage: ((DeviceManager, String) -> Void)?
-    var onAPDUReceived: ((DeviceManager, NSData) -> Void)?
+    var onAPDUReceived: ((DeviceManager, Data) -> Void)?
     
-    private var chunksize = 0
-    private var pendingChunks: [NSData] = []
-    private var writeCharacteristic: CBCharacteristic?
-    private var notifyCharacteristic: CBCharacteristic?
-    private var controlpointLengthCharacteristic: CBCharacteristic?
-    private(set) var state = DeviceManagerState.NotBound {
+    fileprivate var chunksize = 0
+    fileprivate var pendingChunks: [Data] = []
+    fileprivate var writeCharacteristic: CBCharacteristic?
+    fileprivate var notifyCharacteristic: CBCharacteristic?
+    fileprivate var controlpointLengthCharacteristic: CBCharacteristic?
+    fileprivate(set) var state = DeviceManagerState.NotBound {
         didSet {
             onStateChanged?(self, self.state)
         }
@@ -54,11 +54,11 @@ final class DeviceManager: NSObject {
         // discover services
         onDebugMessage?(self, "Discovering services...")
         state = .Binding
-        let serviceUUID = CBUUID(string: self.dynamicType.deviceServiceUUID)
+        let serviceUUID = CBUUID(string: type(of: self).deviceServiceUUID)
         peripheral.discoverServices([serviceUUID])
     }
     
-    func exchangeAPDU(data: NSData) {
+    func exchangeAPDU(_ data: Data) {
         guard state == .Bound else {
             onDebugMessage?(self, "Trying to send APDU \(data) but not bound yet")
             return
@@ -66,7 +66,7 @@ final class DeviceManager: NSObject {
         
         // slice APDU
         onDebugMessage?(self, "Trying to split APDU into chunks...")
-        if let chunks = TransportHelper.split(data, command: .Message, chuncksize: chunksize) where chunks.count > 0 {
+        if let chunks = TransportHelper.split(data, command: .message, chuncksize: chunksize), chunks.count > 0 {
             onDebugMessage?(self, "Successfully split APDU into \(chunks.count) part(s)")
             pendingChunks = chunks
             writeNextPendingChunk()
@@ -77,7 +77,7 @@ final class DeviceManager: NSObject {
         }
     }
     
-    private func writeNextPendingChunk() {
+    fileprivate func writeNextPendingChunk() {
         guard pendingChunks.count > 0 else {
             onDebugMessage?(self, "Trying to write pending chunk but nothing left to write")
             return
@@ -85,22 +85,22 @@ final class DeviceManager: NSObject {
         
         let chunk = pendingChunks.removeFirst()
         onDebugMessage?(self, "Writing pending chunk = \(chunk)")
-        peripheral.writeValue(chunk, forCharacteristic: writeCharacteristic!, type: .WithResponse)
+        peripheral.writeValue(chunk, for: writeCharacteristic!, type: .withResponse)
     }
     
-    private func handleReceivedChunk(chunk: NSData) {
+    fileprivate func handleReceivedChunk(_ chunk: Data) {
         // get chunk type
         switch TransportHelper.getChunkType(chunk) {
-        case .Continuation:
+        case .continuation:
             //onDebugMessage?(self, "Received CONTINUATION chunk")
             break
-        case .Message:
+        case .message:
             //onDebugMessage?(self, "Received MESSAGE chunk")
             break
-        case .Error:
+        case .error:
             //onDebugMessage?(self, "Received ERROR chunk")
             return
-        case .KeepAlive:
+        case .keepAlive:
             //onDebugMessage?(self, "Received KEEPALIVE chunk")
             return
         default:
@@ -110,14 +110,14 @@ final class DeviceManager: NSObject {
         
         // join APDU
         pendingChunks.append(chunk)
-        if let APDU = TransportHelper.join(pendingChunks, command: .Message) {
+        if let APDU = TransportHelper.join(pendingChunks, command: .message) {
             onDebugMessage?(self, "Successfully joined APDU = \(APDU)")
             pendingChunks.removeAll()
             onAPDUReceived?(self, APDU)
         }
     }
     
-    private func resetState() {
+    fileprivate func resetState() {
         writeCharacteristic = nil
         notifyCharacteristic = nil
         controlpointLengthCharacteristic = nil
@@ -129,10 +129,10 @@ final class DeviceManager: NSObject {
 
 extension DeviceManager: CBPeripheralDelegate {
     
-    func peripheral(peripheral: CBPeripheral, didDiscoverServices error: NSError?) {
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         guard state == .Binding else { return }
         guard
-            let services = peripheral.services where services.count > 0,
+            let services = peripheral.services, services.count > 0,
             let service = services.first
         else {
             onDebugMessage?(self, "Unable to discover services")
@@ -142,20 +142,20 @@ extension DeviceManager: CBPeripheralDelegate {
         
         // discover characteristics
         onDebugMessage?(self, "Successfully discovered services")
-        let writeCharacteristicUUID = CBUUID(string: self.dynamicType.writeCharacteristicUUID)
-        let notifyCharacteristicUUID = CBUUID(string: self.dynamicType.notifyCharacteristicUUID)
-        let controlpointLengthCharacteristicUUID = CBUUID(string: self.dynamicType.controlpointLengthCharacteristicUUID)
+        let writeCharacteristicUUID = CBUUID(string: type(of: self).writeCharacteristicUUID)
+        let notifyCharacteristicUUID = CBUUID(string: type(of: self).notifyCharacteristicUUID)
+        let controlpointLengthCharacteristicUUID = CBUUID(string: type(of: self).controlpointLengthCharacteristicUUID)
         onDebugMessage?(self, "Discovering characteristics...")
-        peripheral.discoverCharacteristics([writeCharacteristicUUID, notifyCharacteristicUUID, controlpointLengthCharacteristicUUID], forService: service)
+        peripheral.discoverCharacteristics([writeCharacteristicUUID, notifyCharacteristicUUID, controlpointLengthCharacteristicUUID], for: service)
     }
     
-    func peripheral(peripheral: CBPeripheral, didDiscoverCharacteristicsForService service: CBService, error: NSError?) {
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         guard state == .Binding else { return }
         guard
-            let characteristics = service.characteristics where characteristics.count >= 3,
-            let writeCharacteristic = characteristics.filter({ $0.UUID.UUIDString == self.dynamicType.writeCharacteristicUUID }).first,
-            let notifyCharacteristic = characteristics.filter({ $0.UUID.UUIDString == self.dynamicType.notifyCharacteristicUUID }).first,
-            let controlpointLengthCharacteristic = characteristics.filter({ $0.UUID.UUIDString == self.dynamicType.controlpointLengthCharacteristicUUID }).first
+            let characteristics = service.characteristics, characteristics.count >= 3,
+            let writeCharacteristic = characteristics.filter({ $0.uuid.uuidString == type(of: self).writeCharacteristicUUID }).first,
+            let notifyCharacteristic = characteristics.filter({ $0.uuid.uuidString == type(of: self).notifyCharacteristicUUID }).first,
+            let controlpointLengthCharacteristic = characteristics.filter({ $0.uuid.uuidString == type(of: self).controlpointLengthCharacteristicUUID }).first
         else {
             onDebugMessage?(self, "Unable to discover characteristics")
             resetState()
@@ -170,13 +170,13 @@ extension DeviceManager: CBPeripheralDelegate {
         
         // ask for notifications
         onDebugMessage?(self, "Enabling notifications...")
-        peripheral.setNotifyValue(true, forCharacteristic: notifyCharacteristic)
+        peripheral.setNotifyValue(true, for: notifyCharacteristic)
     }
     
-    func peripheral(peripheral: CBPeripheral, didUpdateNotificationStateForCharacteristic characteristic: CBCharacteristic, error: NSError?) {
+    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
         guard state == .Binding else { return }
         guard characteristic == notifyCharacteristic && characteristic.isNotifying && error == nil else {
-            onDebugMessage?(self, "Unable to enable notifications, error = \(error)")
+            onDebugMessage?(self, "Unable to enable notifications, error = \(error as Error?)")
             resetState()
             return
         }
@@ -184,22 +184,22 @@ extension DeviceManager: CBPeripheralDelegate {
         // ask for chunksize
         onDebugMessage?(self, "Successfully enabled notifications")
         onDebugMessage?(self, "Reading chunksize...")
-        peripheral.readValueForCharacteristic(self.controlpointLengthCharacteristic!)
+        peripheral.readValue(for: self.controlpointLengthCharacteristic!)
     }
     
-    func peripheral(peripheral: CBPeripheral, didUpdateValueForCharacteristic characteristic: CBCharacteristic, error: NSError?) {
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard state == .Bound || state == .Binding else { return }
         guard
             (characteristic == notifyCharacteristic || characteristic == controlpointLengthCharacteristic) && error == nil,
             let data = characteristic.value
         else {
-            onDebugMessage?(self, "Unable to read data, error = \(error), data = \(characteristic.value)")
+            onDebugMessage?(self, "Unable to read data, error = \(error as Error?), data = \(characteristic.value as Data?)")
             resetState()
             return
         }
         
         // received data
-        onDebugMessage?(self, "Received data of size \(data.length) = \(data)")
+        onDebugMessage?(self, "Received data of size \(data.count) = \(data)")
         
         if characteristic == controlpointLengthCharacteristic {
             // extract chunksize
@@ -225,10 +225,10 @@ extension DeviceManager: CBPeripheralDelegate {
         }
     }
     
-    func peripheral(peripheral: CBPeripheral, didWriteValueForCharacteristic characteristic: CBCharacteristic, error: NSError?) {
+    func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
         guard state == .Bound else { return }
         guard characteristic == writeCharacteristic && error == nil else {
-            onDebugMessage?(self, "Unable to write data, error = \(error)")
+            onDebugMessage?(self, "Unable to write data, error = \(error as Error?)")
             resetState()
             return
         }

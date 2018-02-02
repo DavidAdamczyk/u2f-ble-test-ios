@@ -12,12 +12,12 @@ extension CBCentralManagerState: CustomStringConvertible {
     
     public var description: String {
         switch self {
-        case .PoweredOff: return "PoweredOff"
-        case .PoweredOn: return "PoweredOn"
-        case .Resetting: return "Resetting"
-        case .Unauthorized: return "Unauthorized"
-        case .Unsupported: return "Unsupported"
-        case .Unknown: return "Unknown"
+        case .poweredOff: return "PoweredOff"
+        case .poweredOn: return "PoweredOn"
+        case .resetting: return "Resetting"
+        case .unauthorized: return "Unauthorized"
+        case .unsupported: return "Unsupported"
+        case .unknown: return "Unknown"
         }
     }
     

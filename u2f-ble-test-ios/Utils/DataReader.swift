@@ -10,7 +10,7 @@ import Foundation
 
 final class DataReader {
     
-    private let internalData: NSMutableData
+    fileprivate let internalData: NSMutableData
     
     var remainingBytesLength: Int {
         return internalData.length
@@ -74,20 +74,20 @@ final class DataReader {
         return readNextInteger(bigEndian: false)
     }
 
-    func readNextAvailableData() -> NSData? {
+    func readNextAvailableData() -> Data? {
         return readNextDataOfLength(remainingBytesLength)
     }
 
-    func readNextDataOfLength(length: Int) -> NSData? {
+    func readNextDataOfLength(_ length: Int) -> Data? {
         guard length > 0 else { return nil }
         guard internalData.length >= length else { return nil }
         
-        let data = internalData.subdataWithRange(NSMakeRange(0, length))
-        internalData.replaceBytesInRange(NSMakeRange(0, length), withBytes: nil, length: 0)
+        let data = internalData.subdata(with: NSMakeRange(0, length))
+        internalData.replaceBytes(in: NSMakeRange(0, length), withBytes: nil, length: 0)
         return data
     }
     
-    func readNextMutableDataOfLength(length: Int) -> NSMutableData? {
+    func readNextMutableDataOfLength(_ length: Int) -> NSMutableData? {
         if let data = readNextDataOfLength(length) {
             return NSMutableData(data: data)
         }
@@ -96,25 +96,25 @@ final class DataReader {
 
     // MARK: Internal methods
     
-    private func readNextInteger<T: IntegerType>() -> T? {
-        guard let data = readNextDataOfLength(sizeof(T)) else { return nil }
+    fileprivate func readNextInteger<T: Integer>() -> T? {
+        guard let data = readNextDataOfLength(MemoryLayout<T>.size) else { return nil }
         
         var value: T = 0
-        data.getBytes(&value, length: sizeof(T))
+        (data as NSData).getBytes(&value, length: MemoryLayout<T>.size)
         return value
     }
     
-    private func readNextInteger<T: EndianConvertible>(bigEndian bigEndian: Bool) -> T? {
-        guard let data = readNextDataOfLength(sizeof(T)) else { return nil }
+    fileprivate func readNextInteger<T: EndianConvertible>(bigEndian: Bool) -> T? {
+        guard let data = readNextDataOfLength(MemoryLayout<T>.size) else { return nil }
         
-        var value: T = 0
-        data.getBytes(&value, length: sizeof(T))
+        var value: T = 0 as! T
+        (data as NSData).getBytes(&value, length: MemoryLayout<T>.size)
         return bigEndian ? value.bigEndian : value.littleEndian
     }
     
     // MARK: Initialization
     
-    init(data: NSData) {
+    init(data: Data) {
         self.internalData = NSMutableData(data: data)
     }
     
