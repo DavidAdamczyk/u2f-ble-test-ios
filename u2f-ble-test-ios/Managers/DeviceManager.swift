@@ -29,7 +29,8 @@ final class DeviceManager: NSObject {
     var onAPDUReceived: ((DeviceManager, Data) -> Void)?
     
     fileprivate var chunksize = 0
-    fileprivate var pendingChunks: [Data] = []
+    fileprivate var pendingOutput: [Data] = []
+    fileprivate var pendingInput: [Data] = []
     fileprivate var writeCharacteristic: CBCharacteristic?
     fileprivate var notifyCharacteristic: CBCharacteristic?
     fileprivate var controlpointLengthCharacteristic: CBCharacteristic?
@@ -68,7 +69,7 @@ final class DeviceManager: NSObject {
         onDebugMessage?(self, "Trying to split APDU into chunks...")
         if let chunks = TransportHelper.split(data, command: .message, chuncksize: chunksize), chunks.count > 0 {
             onDebugMessage?(self, "Successfully split APDU into \(chunks.count) part(s)")
-            pendingChunks = chunks
+            pendingOutput = chunks
             writeNextPendingChunk()
         }
         else {
@@ -78,12 +79,12 @@ final class DeviceManager: NSObject {
     }
     
     fileprivate func writeNextPendingChunk() {
-        guard pendingChunks.count > 0 else {
+        guard pendingOutput.count > 0 else {
             onDebugMessage?(self, "Trying to write pending chunk but nothing left to write")
             return
         }
         
-        let chunk = pendingChunks.removeFirst()
+        let chunk = pendingOutput.removeFirst()
         onDebugMessage?(self, "Writing pending chunk = \(chunk)")
         peripheral.writeValue(chunk, for: writeCharacteristic!, type: .withResponse)
     }
@@ -109,10 +110,10 @@ final class DeviceManager: NSObject {
         }
         
         // join APDU
-        pendingChunks.append(chunk)
-        if let APDU = TransportHelper.join(pendingChunks, command: .message) {
+        pendingInput.append(chunk)
+        if let APDU = TransportHelper.join(pendingInput, command: .message) {
             onDebugMessage?(self, "Successfully joined APDU = \(APDU)")
-            pendingChunks.removeAll()
+            pendingInput.removeAll()
             onAPDUReceived?(self, APDU)
         }
     }
