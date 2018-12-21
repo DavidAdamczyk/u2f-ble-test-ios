@@ -10,27 +10,27 @@ import Foundation
 
 final class RegisterAPDU: APDUType {
     
-    private static let reservedByte: UInt8 = 0x05
-    private static let derSeqByte: UInt8 = 0x30
-    private static let derLen1Byte: UInt8 = 0x81
-    private static let derLen2Byte: UInt8 = 0x82
+    fileprivate static let reservedByte: UInt8 = 0x05
+    fileprivate static let derSeqByte: UInt8 = 0x30
+    fileprivate static let derLen1Byte: UInt8 = 0x81
+    fileprivate static let derLen2Byte: UInt8 = 0x82
     
-    let challenge: NSData
-    let applicationParameter: NSData
+    let challenge: Data
+    let applicationParameter: Data
     var onDebugMessage: ((APDUType, String) -> Void)?
-    private(set) var publicKey: NSData?
-    private(set) var keyHandle: NSData?
-    private(set) var certificate: NSData?
-    private(set) var signature: NSData?
+    fileprivate(set) var publicKey: Data?
+    fileprivate(set) var keyHandle: Data?
+    fileprivate(set) var certificate: Data?
+    fileprivate(set) var signature: Data?
     
-    init?(challenge: NSData, applicationParameter: NSData) {
-        guard challenge.length == 32 && applicationParameter.length == 32 else { return nil }
+    init?(challenge: Data, applicationParameter: Data) {
+        guard challenge.count == 32 && applicationParameter.count == 32 else { return nil }
         
         self.challenge = challenge
         self.applicationParameter = applicationParameter
     }
     
-    func buildRequest() -> NSData {
+    func buildRequest() -> Data {
         let writer = DataWriter()
         writer.writeNextUInt8(0x00) // cla
         writer.writeNextUInt8(0x01) // ins
@@ -47,18 +47,17 @@ final class RegisterAPDU: APDUType {
         onDebugMessage?(self, "Building REGISTER APDU request...")
         onDebugMessage?(self, "Got challenge = \(challenge)")
         onDebugMessage?(self, "Got application parameter = \(applicationParameter)")
-        return writer.data
+        return writer.data as Data
     }
     
-    func parseResponse(data: NSData) -> Bool {
+    func parseResponse(_ data: Data) -> Bool {
         let reader = DataReader(data: data)
         
         // public key
         guard
             let reservedByte = reader.readNextUInt8(),
-            let publicKey = reader.readNextDataOfLength(65)
-        where
-            reservedByte == self.dynamicType.reservedByte
+            let publicKey = reader.readNextDataOfLength(65),
+            reservedByte == type(of: self).reservedByte
         else {
             return false
         }
@@ -72,15 +71,15 @@ final class RegisterAPDU: APDUType {
         }
 
         // certificate
-        guard let derSequence1 = reader.readNextUInt8() where derSequence1 == self.dynamicType.derSeqByte else { return false }
+        guard let derSequence1 = reader.readNextUInt8(), derSequence1 == type(of: self).derSeqByte else { return false }
         guard let derCertificateLengthKind = reader.readNextUInt8() else { return false }
         
         var certificateLength = 0
-        if derCertificateLengthKind == self.dynamicType.derLen1Byte {
+        if derCertificateLengthKind == type(of: self).derLen1Byte {
             guard let readLength = reader.readNextUInt8() else { return false }
             certificateLength = Int(readLength)
         }
-        else if derCertificateLengthKind == self.dynamicType.derLen2Byte {
+        else if derCertificateLengthKind == type(of: self).derLen2Byte {
             guard let readLength = reader.readNextBigEndianUInt16() else { return false }
             certificateLength = Int(readLength)
         }
@@ -96,17 +95,17 @@ final class RegisterAPDU: APDUType {
         let writer = DataWriter()
         writer.writeNextUInt8(derSequence1)
         writer.writeNextUInt8(derCertificateLengthKind)
-        if derCertificateLengthKind == self.dynamicType.derLen1Byte {
+        if derCertificateLengthKind == type(of: self).derLen1Byte {
             writer.writeNextUInt8(UInt8(certificateLength))
         }
-        else if derCertificateLengthKind == self.dynamicType.derLen2Byte {
+        else if derCertificateLengthKind == type(of: self).derLen2Byte {
             writer.writeNextBigEndianUInt16(UInt16(certificateLength))
         }
         writer.writeNextData(certificate)
         let finalCertificate = writer.data
         
         // signature
-        guard let derSequence2 = reader.readNextUInt8() where derSequence2 == self.dynamicType.derSeqByte else { return false }
+        guard let derSequence2 = reader.readNextUInt8(), derSequence2 == type(of: self).derSeqByte else { return false }
         guard
             let signatureLength = reader.readNextUInt8(),
             let signature = reader.readNextDataOfLength(Int(signatureLength))
@@ -114,14 +113,14 @@ final class RegisterAPDU: APDUType {
             return false
         }
         let finalSignature = NSMutableData()
-        finalSignature.appendBytes([derSequence2], length: 1)
-        finalSignature.appendBytes([signatureLength], length: 1)
-        finalSignature.appendData(signature)
+        finalSignature.append([derSequence2], length: 1)
+        finalSignature.append([signatureLength], length: 1)
+        finalSignature.append(signature)
 
         self.publicKey = publicKey
         self.keyHandle = keyHandle
-        self.certificate = finalCertificate
-        self.signature = finalSignature
+        self.certificate = finalCertificate as Data
+        self.signature = finalSignature as Data
         
         onDebugMessage?(self, "Building REGISTER APDU response...")
         onDebugMessage?(self, "Got public key = \(publicKey)")

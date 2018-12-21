@@ -10,25 +10,25 @@ import UIKit
 
 class ViewController: UIViewController {
 
-    @IBOutlet private weak var loadingIndicator: UIActivityIndicatorView!
-    @IBOutlet private weak var scanButton: UIButton!
-    @IBOutlet private weak var stopButton: UIButton!
-    @IBOutlet private weak var stateLabel: UILabel!
-    @IBOutlet private weak var nameLabel: UILabel!
-    @IBOutlet private weak var textView: UITextView!
+    @IBOutlet fileprivate weak var loadingIndicator: UIActivityIndicatorView!
+    @IBOutlet fileprivate weak var scanButton: UIButton!
+    @IBOutlet fileprivate weak var stopButton: UIButton!
+    @IBOutlet fileprivate weak var stateLabel: UILabel!
+    @IBOutlet fileprivate weak var nameLabel: UILabel!
+    @IBOutlet fileprivate weak var textView: UITextView!
     @IBOutlet var actionButtons: [UIButton]!
     
-    private lazy var bluetoothManager: BluetoothManager = {
+    fileprivate lazy var bluetoothManager: BluetoothManager = {
         let manager = BluetoothManager()
         manager.onStateChanged = self.handleStateChanged
         manager.onDebugMessage = self.handleDebugMessage
         manager.onReceivedAPDU = self.handleReceivedAPDU
         return manager
     }()
-    private var useInvalidApplicationParameter = true
-    private var useInvalidKeyHandle = true
-    private var currentAPDU: APDUType? = nil
-    private var registerAPDU: RegisterAPDU? = nil
+    fileprivate var useInvalidApplicationParameter = true
+    fileprivate var useInvalidKeyHandle = true
+    fileprivate var currentAPDU: APDUType? = nil
+    fileprivate var registerAPDU: RegisterAPDU? = nil
     
     // MARK: Actions
     
@@ -48,8 +48,8 @@ class ViewController: UIViewController {
             challenge.append(UInt8(i))
             applicationParameter.append(UInt8(i) | 0x80)
         }
-        let challengeData = NSData(bytes: &challenge, length: 32)
-        let applicationParameterData = NSData(bytes: &applicationParameter, length: 32)
+        let challengeData = Data(bytes: challenge)
+        let applicationParameterData = Data(bytes: applicationParameter)
         
         if let APDU = RegisterAPDU(challenge: challengeData, applicationParameter: applicationParameterData) {
             APDU.onDebugMessage = self.handleAPDUMessage
@@ -70,7 +70,7 @@ class ViewController: UIViewController {
         sendAuthenticate(checkOnly: true)
     }
     
-    private func sendAuthenticate(checkOnly checkOnly: Bool) {
+    fileprivate func sendAuthenticate(checkOnly: Bool) {
         guard
             let registerAPDU = registerAPDU,
             let originalKeyHandle = registerAPDU.keyHandle else {
@@ -80,7 +80,7 @@ class ViewController: UIViewController {
 
         var challenge: [UInt8] = []
         var applicationParameter: [UInt8] = []
-        let keyHandleData: NSData
+        let keyHandleData: Data
         
         for i in 0..<32 {
             challenge.append(UInt8(i) | 0x10)
@@ -90,16 +90,16 @@ class ViewController: UIViewController {
             applicationParameter[0] = 0xFF
         }
         if useInvalidKeyHandle {
-            let data = NSMutableData(data: originalKeyHandle)
-            data.replaceBytesInRange(NSMakeRange(0, 2), withBytes: [0xFF, 0xFF] as [UInt8], length: 2)
-            data.replaceBytesInRange(NSMakeRange(data.length - 1, 1), withBytes: [0xFF] as [UInt8], length: 1)
+            var data = NSData(data: originalKeyHandle as Data) as Data
+            data.replaceSubrange(0..<2, with: [0xFF, 0xFF] as [UInt8], count: 2)
+            data.replaceSubrange((data.count - 1)..<data.count, with: [0xFF] as [UInt8], count: 1)
             keyHandleData = data
         }
         else {
-            keyHandleData = originalKeyHandle
+            keyHandleData = originalKeyHandle as Data
         }
-        let challengeData = NSData(bytes: &challenge, length: 32)
-        let applicationParameterData = NSData(bytes: &applicationParameter, length: 32)
+        let challengeData = Data(bytes: challenge)
+        let applicationParameterData = Data(bytes: applicationParameter)
         
         if let APDU = AuthenticateAPDU(registerAPDU: registerAPDU, challenge: challengeData, applicationParameter: applicationParameterData, keyHandle: keyHandleData, checkOnly: checkOnly) {
             APDU.onDebugMessage = self.handleAPDUMessage
@@ -128,7 +128,7 @@ class ViewController: UIViewController {
     
     // MARK: BluetoothManager
     
-    private func handleStateChanged(manager: BluetoothManager, state: BluetoothManagerState) {
+    fileprivate func handleStateChanged(_ manager: BluetoothManager, state: BluetoothManagerState) {
         updateUI()
         
         if state == .Disconnected {
@@ -136,47 +136,47 @@ class ViewController: UIViewController {
         }
     }
     
-    private func handleDebugMessage(manager: BluetoothManager, message: String) {
+    fileprivate func handleDebugMessage(_ manager: BluetoothManager, message: String) {
         appendLogMessage(message)
     }
     
-    private func handleReceivedAPDU(manager: BluetoothManager, data: NSData) {
-        if let success = currentAPDU?.parseResponse(data) where success {
-            appendLogMessage("Successfully parsed APDU response of kind \(currentAPDU)")
+    fileprivate func handleReceivedAPDU(_ manager: BluetoothManager, data: Data) {
+        if let success = currentAPDU?.parseResponse(data), success {
+            appendLogMessage("Successfully parsed APDU response of kind \(currentAPDU as APDUType?)")
             if currentAPDU is RegisterAPDU {
                 registerAPDU = currentAPDU as? RegisterAPDU
             }
         }
         else {
-            appendLogMessage("Failed to parse APDU response of kind \(currentAPDU.dynamicType)")
+            appendLogMessage("Failed to parse APDU response of kind \(type(of: currentAPDU as APDUType?))")
         }
         currentAPDU = nil
     }
     
     // MARK: APDU
     
-    private func handleAPDUMessage(APDU: APDUType, message: String) {
+    fileprivate func handleAPDUMessage(_ APDU: APDUType, message: String) {
         appendLogMessage(message)
     }
     
     // MARK: User interface
     
-    private func appendLogMessage(message: String) {
+    fileprivate func appendLogMessage(_ message: String) {
         textView.text = textView.text + "- \(message)\n"
-        let range = NSMakeRange(textView.text.characters.count - 1, 1)
+        let range = NSMakeRange(textView.text.count - 1, 1)
         UIView.setAnimationsEnabled(false)
         textView.scrollRangeToVisible(range)
         UIView.setAnimationsEnabled(true)
     }
     
-    private func updateUI() {
+    fileprivate func updateUI() {
         bluetoothManager.state == .Scanning ? loadingIndicator.startAnimating() : loadingIndicator.stopAnimating()
         stateLabel.text = bluetoothManager.state.rawValue
-        scanButton.enabled = bluetoothManager.state == .Disconnected
-        stopButton.enabled = bluetoothManager.state == .Connecting || bluetoothManager.state == .Connected || bluetoothManager.state == .Scanning
-        nameLabel.hidden = bluetoothManager.state != .Connected
+        scanButton.isEnabled = bluetoothManager.state == .Disconnected
+        stopButton.isEnabled = bluetoothManager.state == .Connecting || bluetoothManager.state == .Connected || bluetoothManager.state == .Scanning
+        nameLabel.isHidden = bluetoothManager.state != .Connected
         nameLabel.text = bluetoothManager.deviceName
-        actionButtons.forEach() { $0.enabled = bluetoothManager.state == .Connected }
+        actionButtons.forEach() { $0.isEnabled = bluetoothManager.state == .Connected }
     }
     
     override func viewDidLoad() {

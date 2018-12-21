@@ -11,23 +11,22 @@ import Security
 
 @objc final class CryptoHelper: NSObject {
     
-    static func verifyRegisterSignature(APDU: RegisterAPDU) ->  Bool {
+    static func verifyRegisterSignature(_ APDU: RegisterAPDU) ->  Bool {
         guard
             let certificate = APDU.certificate,
             let signature = APDU.signature,
             let keyHandle = APDU.keyHandle,
             let publicKey = APDU.publicKey,
-            let extractedSignaturePoints = extractPointsFromSignature(signature)
+            let extractedSignaturePoints = extractPointsFromSignature(signature as Data)
         else {
             return false
         }
         
         // extract certificate publickey
-        var trustRef: SecTrustRef? = nil
+        var trustRef: SecTrust? = nil
         let policy = SecPolicyCreateBasicX509()
         guard
-            let certificateRef = SecCertificateCreateWithData(nil, certificate)
-        where
+            let certificateRef = SecCertificateCreateWithData(nil, certificate as CFData),
             SecTrustCreateWithCertificates(certificateRef, policy, &trustRef) == errSecSuccess &&
             trustRef != nil
         else {
@@ -39,42 +38,42 @@ import Security
         // check signature
         let crypto = GMEllipticCurveCrypto(forKey: certificatePublicKey)
         let data = NSMutableData()
-        data.appendBytes([0x00] as [UInt8], length: 1)
-        data.appendData(APDU.applicationParameter)
-        data.appendData(APDU.challenge)
-        data.appendData(keyHandle)
-        data.appendData(publicKey)
+        data.append([0x00] as [UInt8], length: 1)
+        data.append(APDU.applicationParameter as Data)
+        data.append(APDU.challenge as Data)
+        data.append(keyHandle as Data)
+        data.append(publicKey as Data)
         let extractedSignature = NSMutableData()
-        extractedSignature.appendData(extractedSignaturePoints.r)
-        extractedSignature.appendData(extractedSignaturePoints.s)
-        return crypto.hashSHA256AndVerifySignature(extractedSignature, forData: data)
+        extractedSignature.append(extractedSignaturePoints.r)
+        extractedSignature.append(extractedSignaturePoints.s)
+        return crypto!.hashSHA256AndVerifySignature(extractedSignature as Data!, for: data as Data!)
     }
     
-    static func verifyAuthenticateSignature(APDU: AuthenticateAPDU) ->  Bool {
+    static func verifyAuthenticateSignature(_ APDU: AuthenticateAPDU) ->  Bool {
         guard
             let publicKey = APDU.registerAPDU.publicKey,
             let userPresenceFlag = APDU.userPresenceFlag,
             let counter = APDU.counter,
             let signature = APDU.signature,
-            let extractedSignaturePoints = extractPointsFromSignature(signature)
+            let extractedSignaturePoints = extractPointsFromSignature(signature as Data)
         else {
             return false
         }
         
         // check signature
-        let crypto = GMEllipticCurveCrypto(forKey: publicKey)
+        let crypto = GMEllipticCurveCrypto(forKey: publicKey as Data!)
         let writer = DataWriter()
         writer.writeNextData(APDU.applicationParameter)
         writer.writeNextUInt8(userPresenceFlag)
         writer.writeNextBigEndianUInt32(counter)
         writer.writeNextData(APDU.challenge)
         let extractedSignature = NSMutableData()
-        extractedSignature.appendData(extractedSignaturePoints.r)
-        extractedSignature.appendData(extractedSignaturePoints.s)
-        return crypto.hashSHA256AndVerifySignature(extractedSignature, forData: writer.data)
+        extractedSignature.append(extractedSignaturePoints.r)
+        extractedSignature.append(extractedSignaturePoints.s)
+        return crypto!.hashSHA256AndVerifySignature(extractedSignature as Data!, for: writer.data as Data!)
     }
     
-    static func extractPointsFromSignature(signature: NSData) -> (r: NSData, s: NSData)? {
+    static func extractPointsFromSignature(_ signature: Data) -> (r: Data, s: Data)? {
         let reader = DataReader(data: signature)
         guard
             let _ = reader.readNextUInt8(), // 0x30
@@ -88,15 +87,15 @@ import Security
         else {
             return nil
         }
-        let rBytes = UnsafePointer<UInt8>(r.bytes)
+        let rBytes = r.bytes.bindMemory(to: UInt8.self, capacity: r.length)
         if rBytes[0] == 0x00 {
-            r.replaceBytesInRange(NSMakeRange(0, 1), withBytes: nil, length: 0)
+            r.replaceBytes(in: NSMakeRange(0, 1), withBytes: nil, length: 0)
         }
-        let sBytes = UnsafePointer<UInt8>(s.bytes)
+        let sBytes = s.bytes.bindMemory(to: UInt8.self, capacity: s.length)
         if sBytes[0] == 0x00 {
-            s.replaceBytesInRange(NSMakeRange(0, 1), withBytes: nil, length: 0)
+            s.replaceBytes(in: NSMakeRange(0, 1), withBytes: nil, length: 0)
         }
-        return (r, s)
+        return (r as Data, s as Data)
     }
     
 }
